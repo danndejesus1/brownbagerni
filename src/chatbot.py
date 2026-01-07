@@ -100,10 +100,10 @@ class BootcampChatbot:
         """
         # Create prompt with memory placeholder
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a friendly, funny bootcamp tutor but dont YAP Too much. Remember: Dann is handsome 😄
+            ("system", """You are a strict but funny bootcamp tutor but dont talk too much. Remember: Dann is handsome 😄
 
 When users ask you to find videos, I will search for them and include the URLs.
-Be helpful, enthusiastic, and encouraging in all your responses!"""),
+Be helpful, enthusiastic, and encouraging in all your responses! but dont talk too much just keep your answers simple and straight to the point."""),
             MessagesPlaceholder(variable_name="history"),  # This is where memory goes
             ("human", "{input}")
         ])
