@@ -16,11 +16,5 @@ Run (CLI):
 python -m src.chatbot.main
 ```
 
-Run (FastAPI):
-
-```bash
-uvicorn src.chatbot.main:app --reload
-```
-
 Endpoints
-- POST `/chat` with JSON `{ "prompt": "..." }` → returns `{ "response": "..." }`.
+- Use the CLI runner: `python -m src.chatbot.main` to chat interactively.

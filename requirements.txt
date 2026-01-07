@@ -1,5 +1,3 @@
 langchain
-fastapi
-uvicorn
 python-dotenv
 requests
