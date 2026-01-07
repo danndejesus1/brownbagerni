@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# virtualenv
+venv/
+.venv/
+
+# Env files
+.env
+
+# Byte-compiled / optimized / DLL files
+*.so
+
+# IDEs
+.vscode/
