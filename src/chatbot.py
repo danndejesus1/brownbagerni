@@ -16,12 +16,20 @@ load_dotenv()
 
 # ------------------- TOOL DEFINITION -------------------
 @tool
-def youtube_search(query: str) -> str:
-    """Search for YouTube videos. Use when user asks for videos, tutorials, or highlights."""
+def youtube_search(query: str, max_results: int = 3) -> str:
+    """Search for YouTube videos. Use when user asks for videos, tutorials, or highlights.
+    
+    Args:
+        query: Search query for YouTube
+        max_results: Number of videos to return (default: 3, max: 10)
+    """
     try:
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
             return "YouTube API key not configured. Please set YOUTUBE_API_KEY in .env"
+        
+        # Limit max_results to reasonable range
+        max_results = max(1, min(max_results, 10))
         
         youtube = build("youtube", "v3", developerKey=api_key)
         
@@ -29,7 +37,7 @@ def youtube_search(query: str) -> str:
             part="snippet",
             q=query,
             type="video",
-            maxResults=3
+            maxResults=max_results  # Now it's dynamic!
         )
         response = request.execute()
         
@@ -43,7 +51,7 @@ def youtube_search(query: str) -> str:
             url = f"https://www.youtube.com/watch?v={video_id}"
             results.append(f"• {title}\n  {url}")
         
-        return "Found YouTube videos:\n" + "\n\n".join(results)
+        return f"Found {len(results)} YouTube videos:\n" + "\n\n".join(results)
     except Exception as e:
         return f"Search failed: {str(e)}"
 
