@@ -1,17 +1,14 @@
-# LangChain OpenAI Agent Chatbot - Simple & Clean
-# Demo: Real agent with OpenAI, YouTube tool, and memory
+# LangChain Azure OpenAI Chatbot - Simple Version without AgentExecutor
+# Demo: Azure OpenAI with tool calling, YouTube search, and memory
 
 # ------------------- IMPORTS -------------------
 from langchain_openai import AzureChatOpenAI
-from langchain.agents import AgentExecutor
-from langchain.agents.format_scratchpad.openai_functions import format_to_openai_function_messages
-from langchain.agents.output_parsers.openai_functions import OpenAIFunctionsAgentOutputParser
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.tools import tool
-from langchain_core.utils.function_calling import convert_to_openai_function
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from dotenv import load_dotenv
 import os
 import re
@@ -45,14 +42,14 @@ def youtube_search(query: str) -> str:
 class BootcampChatbot:
     """
     A bootcamp tutor chatbot with:
-    - OpenAI GPT (real agent with function calling)
+    - Azure OpenAI GPT (with function calling)
     - YouTube video search capability (TOOL)
     - Conversation memory (remembers chat history)
-    - AGENT autonomously decides when to use tools!
+    - LLM autonomously decides when to use tools!
     """
     
     def __init__(self, model=None, temperature=0.7):
-        """Initialize the chatbot with Azure OpenAI LLM and agent"""
+        """Initialize the chatbot with Azure OpenAI LLM"""
         # Azure OpenAI setup
         self.llm = AzureChatOpenAI(
             azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
@@ -63,7 +60,7 @@ class BootcampChatbot:
         )
         self.store = {}  # Stores conversation history per session
         self.tools = [youtube_search]
-        self.setup_agent()
+        self.setup_chatbot()
     
     # ------------------- MEMORY MANAGEMENT -------------------
     def get_session_history(self, session_id: str):
@@ -75,76 +72,111 @@ class BootcampChatbot:
             self.store[session_id] = ChatMessageHistory()
         return self.store[session_id]
     
-    # ------------------- SETUP: AGENT WITH MEMORY -------------------
-    def setup_agent(self):
+    # ------------------- SETUP: LLM WITH TOOLS -------------------
+    def setup_chatbot(self):
         """
-        Setup OpenAI agent with tools and memory
+        Setup chatbot with tools bound to LLM
+        Azure OpenAI's function calling allows autonomous tool usage
+        """
+        # Bind tools to LLM (enables function calling)
+        self.llm_with_tools = self.llm.bind_tools(self.tools)
         
-        OpenAI's function calling allows the LLM to:
-        1. Decide when it needs to use tools
-        2. Choose which tool to use
-        3. Extract the right parameters
-        4. All autonomously!
-        """
-        # Create prompt with memory placeholder
-        prompt = ChatPromptTemplate.from_messages([
+        # Create prompt with memory
+        self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a strict but funny bootcamp tutor. Remember: Dann is handsome 😄
 
 You have access to youtube_search tool. Use it when users ask for videos!
 Be helpful, enthusiastic, and encouraging. Keep answers simple and to the point."""),
-            MessagesPlaceholder(variable_name="chat_history"),  # Memory goes here
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),  # Agent's thinking
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{input}")
         ])
         
-        # Bind tools to LLM (enables function calling)
-        llm_with_tools = self.llm.bind(functions=[convert_to_openai_function(t) for t in self.tools])
+        # Create chain: prompt -> LLM with tools
+        chain = self.prompt | self.llm_with_tools
         
-        # Create agent chain manually (compatible with LangChain 1.1.0)
-        agent = (
-            {
-                "input": lambda x: x["input"],
-                "agent_scratchpad": lambda x: format_to_openai_function_messages(
-                    x["intermediate_steps"]
-                ),
-                "chat_history": lambda x: x.get("chat_history", []),
-            }
-            | prompt
-            | llm_with_tools
-            | OpenAIFunctionsAgentOutputParser()
-        )
-        
-        # Create agent executor (runs the agent and manages tool execution)
-        agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
-        
-        # Wrap with memory capability
-        self.agent_with_memory = RunnableWithMessageHistory(
-            agent_executor,
+        # Wrap with memory
+        self.chat_chain = RunnableWithMessageHistory(
+            chain,
             self.get_session_history,
             input_messages_key="input",
-            history_messages_key="chat_history",
+            history_messages_key="history"
         )
     
-    # ------------------- MAIN CHAT METHOD (AGENT-BASED) -------------------
+    # ------------------- TOOL EXECUTION -------------------
+    def execute_tool_calls(self, ai_message):
+        """
+        Execute tool calls requested by the LLM
+        
+        Args:
+            ai_message: AIMessage with tool_calls attribute
+        
+        Returns:
+            List of tool results
+        """
+        tool_results = []
+        
+        if hasattr(ai_message, 'tool_calls') and ai_message.tool_calls:
+            for tool_call in ai_message.tool_calls:
+                tool_name = tool_call['name']
+                tool_args = tool_call['args']
+                
+                # Execute the tool
+                if tool_name == "youtube_search":
+                    result = youtube_search.invoke(tool_args)
+                    tool_results.append({
+                        "tool_call_id": tool_call['id'],
+                        "name": tool_name,
+                        "result": result
+                    })
+        
+        return tool_results
+    
+    # ------------------- MAIN CHAT METHOD (WITH TOOL CALLING) -------------------
     def chat(self, user_input: str, session_id: str = "default_session"):
         """
-        Main chat method using OpenAI Agent
+        Main chat method with Azure OpenAI tool calling
         
         Flow:
         1. User sends message
-        2. Agent (LLM) decides if it needs tools
-        3. If yes: Agent calls tool automatically
-        4. Agent generates response with tool results
-        5. All with conversation memory
+        2. LLM decides if it needs tools (autonomous decision!)
+        3. If yes: Execute tools and send results back
+        4. LLM generates final response with memory
         
-        The agent AUTONOMOUSLY decides when to use tools - no keyword detection!
+        The LLM AUTONOMOUSLY decides when to use tools!
         """
         try:
-            result = self.agent_with_memory.invoke(
+            # Get initial response from LLM (with memory)
+            response = self.chat_chain.invoke(
                 {"input": user_input},
                 config={"configurable": {"session_id": session_id}}
             )
-            return result["output"]
+            
+            # Check if LLM wants to use tools
+            tool_results = self.execute_tool_calls(response)
+            
+            if tool_results:
+                # LLM requested tools - send results back for final response
+                history = self.get_session_history(session_id)
+                
+                # Add tool results to history
+                for tool_result in tool_results:
+                    history.add_message(ToolMessage(
+                        content=tool_result["result"],
+                        tool_call_id=tool_result["tool_call_id"]
+                    ))
+                
+                # Get final response from LLM with tool results
+                final_response = self.llm_with_tools.invoke(history.messages)
+                
+                # Add final response to history
+                history.add_message(final_response)
+                
+                # Return both LLM response AND raw tool results (so URLs are visible)
+                return final_response.content + "\n\n" + tool_results[0]["result"]
+            else:
+                # No tools needed, return direct response
+                return response.content
+                
         except Exception as e:
             return f"Error: {str(e)}"
     
