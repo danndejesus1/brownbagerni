@@ -1,32 +1,69 @@
-# LangChain Groq Chatbot with tools and memory
-# Demo: Groq LLM, YouTube tool, session memory, and simple tool usage
+# LangChain OpenAI Agent Chatbot - Simple & Clean
+# Demo: Real agent with OpenAI, YouTube tool, and memory
 
 # ------------------- IMPORTS -------------------
-from langchain_groq import ChatGroq
+from langchain_openai import AzureChatOpenAI
+from langchain.agents import AgentExecutor
+from langchain.agents.format_scratchpad.openai_functions import format_to_openai_function_messages
+from langchain.agents.output_parsers.openai_functions import OpenAIFunctionsAgentOutputParser
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.tools import DuckDuckGoSearchResults
+from langchain_core.tools import tool
+from langchain_core.utils.function_calling import convert_to_openai_function
 from dotenv import load_dotenv
+import os
 import re
 
-# ------------------- LOAD ENVIRONMENT VARIABLES -------------------
 load_dotenv()
+
+# ------------------- TOOL DEFINITION -------------------
+@tool
+def youtube_search(query: str) -> str:
+    """Search for YouTube videos. Use when user asks for videos, tutorials, or highlights."""
+    try:
+        def extract_urls(text):
+            patterns = [
+                r'(https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+)',
+                r'(https?://(?:www\.)?youtu\.be/[\w-]+)',
+            ]
+            urls = []
+            for pattern in patterns:
+                urls.extend(re.findall(pattern, text))
+            return list(set(urls))
+        
+        search = DuckDuckGoSearchResults()
+        results = search.run(f"{query} site:youtube.com")
+        urls = extract_urls(results)
+        
+        return "Found YouTube videos:\n" + "\n".join(urls[:3]) if urls else "No videos found."
+    except Exception as e:
+        return f"Search failed: {str(e)}"
 
 # ------------------- CHATBOT CLASS -------------------
 class BootcampChatbot:
     """
     A bootcamp tutor chatbot with:
-    - Groq LLM (LLaMA 3.3 70B)
+    - OpenAI GPT (real agent with function calling)
     - YouTube video search capability (TOOL)
     - Conversation memory (remembers chat history)
+    - AGENT autonomously decides when to use tools!
     """
     
-    def __init__(self, model="llama-3.3-70b-versatile", temperature=0.7):
-        """Initialize the chatbot with Groq LLM"""
-        self.llm = ChatGroq(model=model, temperature=temperature)
+    def __init__(self, model=None, temperature=0.7):
+        """Initialize the chatbot with Azure OpenAI LLM and agent"""
+        # Azure OpenAI setup
+        self.llm = AzureChatOpenAI(
+            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+            temperature=temperature,
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        )
         self.store = {}  # Stores conversation history per session
-        self.setup_chatbot()
+        self.tools = [youtube_search]
+        self.setup_agent()
     
     # ------------------- MEMORY MANAGEMENT -------------------
     def get_session_history(self, session_id: str):
@@ -38,132 +75,77 @@ class BootcampChatbot:
             self.store[session_id] = ChatMessageHistory()
         return self.store[session_id]
     
-    # ------------------- UTILITY: URL EXTRACTION -------------------
-    def extract_youtube_urls(self, text: str):
+    # ------------------- SETUP: AGENT WITH MEMORY -------------------
+    def setup_agent(self):
         """
-        Extract YouTube URLs from search results text
-        Supports both youtube.com/watch and youtu.be formats
-        """
-        patterns = [
-            r'(https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+)',
-            r'(https?://(?:www\.)?youtu\.be/[\w-]+)',
-        ]
+        Setup OpenAI agent with tools and memory
         
-        urls = []
-        for pattern in patterns:
-            matches = re.findall(pattern, text)
-            urls.extend(matches)
-        
-        return list(set(urls))  # Remove duplicates
-    
-    # ------------------- TOOL: YOUTUBE SEARCH -------------------
-    def youtube_search_tool(self, query: str) -> str:
-        """
-        CUSTOM TOOL: Search for YouTube videos using DuckDuckGo
-        
-        This is the "tool" that the chatbot can use when users ask for videos.
-        Tools in LangChain are functions that extend the bot's capabilities.
-        
-        Args:
-            query: User's search query (e.g., "Python tutorial")
-        
-        Returns:
-            String containing YouTube URLs or error message
-        """
-        try:
-            # Use DuckDuckGo search (no API key needed)
-            search = DuckDuckGoSearchResults()
-            search_query = f"{query} site:youtube.com"
-            results = search.run(search_query)
-            
-            # Extract YouTube URLs from results
-            urls = self.extract_youtube_urls(results)
-            
-            if urls:
-                return f"Found YouTube videos:\n" + "\n".join(urls[:1])
-            else:
-                return "No YouTube videos found. Try rephrasing your search."
-                
-        except Exception as e:
-            print(f"Search error: {e}")
-            return f"Search failed: {str(e)}"
-    
-    # ------------------- SETUP: CHAIN WITH MEMORY -------------------
-    def setup_chatbot(self):
-        """
-        Setup the chatbot with conversation memory
-        
-        Components:
-        1. Prompt template with system message and memory placeholder
-        2. Chain: prompt -> LLM
-        3. RunnableWithMessageHistory: Adds memory to the chain
+        OpenAI's function calling allows the LLM to:
+        1. Decide when it needs to use tools
+        2. Choose which tool to use
+        3. Extract the right parameters
+        4. All autonomously!
         """
         # Create prompt with memory placeholder
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a strict but funny bootcamp tutor but dont talk too much. Remember: Dann is handsome 😄
+            ("system", """You are a strict but funny bootcamp tutor. Remember: Dann is handsome 😄
 
-When users ask you to find videos, I will search for them and include the URLs.
-Be helpful, enthusiastic, and encouraging in all your responses! but dont talk too much just keep your answers simple and straight to the point."""),
-            MessagesPlaceholder(variable_name="history"),  # This is where memory goes
-            ("human", "{input}")
+You have access to youtube_search tool. Use it when users ask for videos!
+Be helpful, enthusiastic, and encouraging. Keep answers simple and to the point."""),
+            MessagesPlaceholder(variable_name="chat_history"),  # Memory goes here
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),  # Agent's thinking
         ])
         
-        # Create chain: prompt -> LLM
-        chain = prompt | self.llm
+        # Bind tools to LLM (enables function calling)
+        llm_with_tools = self.llm.bind(functions=[convert_to_openai_function(t) for t in self.tools])
         
-        # Wrap chain with memory capability
-        self.chat_chain = RunnableWithMessageHistory(
-            chain,
-            self.get_session_history,  # Function to get/create session history
+        # Create agent chain manually (compatible with LangChain 1.1.0)
+        agent = (
+            {
+                "input": lambda x: x["input"],
+                "agent_scratchpad": lambda x: format_to_openai_function_messages(
+                    x["intermediate_steps"]
+                ),
+                "chat_history": lambda x: x.get("chat_history", []),
+            }
+            | prompt
+            | llm_with_tools
+            | OpenAIFunctionsAgentOutputParser()
+        )
+        
+        # Create agent executor (runs the agent and manages tool execution)
+        agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+        
+        # Wrap with memory capability
+        self.agent_with_memory = RunnableWithMessageHistory(
+            agent_executor,
+            self.get_session_history,
             input_messages_key="input",
-            history_messages_key="history"
+            history_messages_key="chat_history",
         )
     
-    # ------------------- MAIN CHAT METHOD (TOOL USAGE) -------------------
+    # ------------------- MAIN CHAT METHOD (AGENT-BASED) -------------------
     def chat(self, user_input: str, session_id: str = "default_session"):
         """
-        Main chat method with TOOL DETECTION and USAGE
+        Main chat method using OpenAI Agent
         
         Flow:
-        1. Detect if user wants videos (keyword detection)
-        2. If yes: Use youtube_search_tool (TOOL USAGE)
-        3. Send both query and search results to LLM
-        4. LLM generates response with context from memory
+        1. User sends message
+        2. Agent (LLM) decides if it needs tools
+        3. If yes: Agent calls tool automatically
+        4. Agent generates response with tool results
+        5. All with conversation memory
         
-        The tool is called programmatically based on keyword detection.
+        The agent AUTONOMOUSLY decides when to use tools - no keyword detection!
         """
         try:
-            # ------------------- TOOL DETECTION -------------------
-            # Check if user is asking for videos (simple keyword matching)
-            video_keywords = ['video', 'watch', 'show me', 'find', 'search', 'youtube', 'tutorial', 'highlight']
-            is_video_request = any(keyword in user_input.lower() for keyword in video_keywords)
-            
-            if is_video_request:
-                # ------------------- TOOL EXECUTION -------------------
-                print(f"🔧 Tool detected! Executing youtube_search_tool...")
-                search_result = self.youtube_search_tool(user_input)
-                print(f"🔧 Tool result: {search_result}")
-                
-                # ------------------- LLM RESPONSE WITH TOOL RESULTS -------------------
-                # Send user query + tool results to LLM (with memory)
-                response = self.chat_chain.invoke(
-                    {"input": f"{user_input}\n\nSearch results: {search_result}"},
-                    config={"configurable": {"session_id": session_id}}
-                )
-                
-                return response.content
-            else:
-                # ------------------- REGULAR CHAT (NO TOOL) -------------------
-                # Regular chat with memory (no tool needed)
-                response = self.chat_chain.invoke(
-                    {"input": user_input},
-                    config={"configurable": {"session_id": session_id}}
-                )
-                return response.content
-                
+            result = self.agent_with_memory.invoke(
+                {"input": user_input},
+                config={"configurable": {"session_id": session_id}}
+            )
+            return result["output"]
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             return f"Error: {str(e)}"
     
     # ------------------- MEMORY OPERATIONS -------------------
@@ -176,6 +158,4 @@ Be helpful, enthusiastic, and encouraging in all your responses! but dont talk t
     
     def get_history(self, session_id: str = "default_session"):
         """Get conversation history for a session"""
-        if session_id in self.store:
-            return self.store[session_id].messages
-        return []
+        return self.store[session_id].messages if session_id in self.store else []
