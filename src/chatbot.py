@@ -5,13 +5,12 @@
 from langchain_openai import AzureChatOpenAI
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
+from googleapiclient.discovery import build
 from dotenv import load_dotenv
 import os
-import re
 
 load_dotenv()
 
@@ -20,21 +19,31 @@ load_dotenv()
 def youtube_search(query: str) -> str:
     """Search for YouTube videos. Use when user asks for videos, tutorials, or highlights."""
     try:
-        def extract_urls(text):
-            patterns = [
-                r'(https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+)',
-                r'(https?://(?:www\.)?youtu\.be/[\w-]+)',
-            ]
-            urls = []
-            for pattern in patterns:
-                urls.extend(re.findall(pattern, text))
-            return list(set(urls))
+        api_key = os.getenv("YOUTUBE_API_KEY")
+        if not api_key:
+            return "YouTube API key not configured. Please set YOUTUBE_API_KEY in .env"
         
-        search = DuckDuckGoSearchResults()
-        results = search.run(f"{query} site:youtube.com")
-        urls = extract_urls(results)
+        youtube = build("youtube", "v3", developerKey=api_key)
         
-        return "Found YouTube videos:\n" + "\n".join(urls[:1]) if urls else "No videos found."
+        request = youtube.search().list(
+            part="snippet",
+            q=query,
+            type="video",
+            maxResults=3
+        )
+        response = request.execute()
+        
+        if not response.get("items"):
+            return "No videos found."
+        
+        results = []
+        for item in response["items"]:
+            title = item["snippet"]["title"]
+            video_id = item["id"]["videoId"]
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            results.append(f"• {title}\n  {url}")
+        
+        return "Found YouTube videos:\n" + "\n\n".join(results)
     except Exception as e:
         return f"Search failed: {str(e)}"
 
