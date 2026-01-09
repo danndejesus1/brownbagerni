@@ -41,8 +41,8 @@ def extract_video_urls(text):
     return urls
 
 # ------------------- TITLE -------------------
-st.title("🤖 Bootcamp Tutor Chatbot")
-st.caption("Powered by Groq & LangChain - Ask me to find videos!")
+st.title("🤖 Brown Bag: Chatbots")
+st.caption("Powered by LangGraph & LangChain - Ask me to find videos!")
 
 # ------------------- INITIALIZE SESSION STATE -------------------
 if "messages" not in st.session_state:
@@ -108,8 +108,8 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
             
             except Exception as e:
                 st.error(f"Error: {str(e)}")
-                st.info("Make sure your GROQ_API_KEY is set in your .env file!")
+                st.info("Make sure your api key is set in your .env file!")
 
 # ------------------- FOOTER -------------------
 st.divider()
-st.caption("Built with ❤️ using Streamlit, LangChain & Groq")
+st.caption("Built with ❤️ using Streamlit, LangChain & LangGraph")
