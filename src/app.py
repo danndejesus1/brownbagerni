@@ -5,7 +5,6 @@ from chatbot import BootcampChatbot  # Import from backend
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(
     page_title="Bootcamp Tutor Chatbot",
-    page_icon="🤖",
     layout="centered"
 )
 
