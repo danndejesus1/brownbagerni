@@ -1,3 +1,6 @@
+# LangChain Azure OpenAI Chatbot - Agent Version with LangGraph
+# Demo: Azure OpenAI with Agent, YouTube search, and memory
+
 # ------------------- IMPORTS -------------------
 from langchain_openai import AzureChatOpenAI
 from langchain_community.chat_message_histories import ChatMessageHistory
@@ -14,6 +17,12 @@ load_dotenv()
 # ------------------- TOOL DEFINITION -------------------
 @tool
 def youtube_search(query: str, max_results: int = 1) -> str:
+    """Search for YouTube videos. Use when user asks for videos, tutorials, or highlights.
+    
+    Args:
+        query: Search query for YouTube
+        max_results: Number of videos to return (default: 1, max: 10)
+    """
     try:
         api_key = os.getenv("YOUTUBE_API_KEY")
         if not api_key:
@@ -87,7 +96,7 @@ class BootcampChatbot:
         The Agent handles tool calling autonomously in a loop!
         """
         # System prompt for the agent
-        system_prompt = """You are a strict but funny bootcamp tutor. Remember: Dann is  😄
+        system_prompt = """You are a strict but funny bootcamp tutor. Remember: Dann is handsome 😄
 
 You have access to youtube_search tool. Use it when users ask for videos!
 Be helpful, enthusiastic, and encouraging. Keep answers simple and to the point."""
@@ -101,7 +110,17 @@ Be helpful, enthusiastic, and encouraging. Keep answers simple and to the point.
     
     # ------------------- MAIN CHAT METHOD (AGENT HANDLES TOOLS) -------------------
     def chat(self, user_input: str, session_id: str = "default_session"):
-      
+        """
+        Main chat method using LangGraph ReAct Agent
+        
+        Flow:
+        1. User sends message
+        2. Agent decides if it needs tools (autonomous decision!)
+        3. Agent executes tools in a loop if needed
+        4. Agent generates final response
+        
+        The Agent handles the entire tool calling loop!
+        """
         try:
             # Get conversation history
             history = self.get_session_history(session_id)
@@ -126,12 +145,12 @@ Be helpful, enthusiastic, and encouraging. Keep answers simple and to the point.
     
     # ------------------- MEMORY OPERATIONS -------------------
     def clear_history(self, session_id: str = "default_session"):
-     
+        """Clear conversation history for a session"""
         if session_id in self.store:
             self.store[session_id] = ChatMessageHistory()
             return True
         return False
     
     def get_history(self, session_id: str = "default_session"):
-      
+        """Get conversation history for a session"""
         return self.store[session_id].messages if session_id in self.store else []
