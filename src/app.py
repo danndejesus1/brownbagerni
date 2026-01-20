@@ -40,7 +40,7 @@ def extract_video_urls(text):
     return urls
 
 # ------------------- TITLE -------------------
-st.title("Brown Bag: Chatbots")
+st.title("Brown Bag: Powered-up! Chatbot")
 st.caption("Powered by LangGraph & LangChain - Ask me to find videos!")
 
 # ------------------- INITIALIZE SESSION STATE -------------------
@@ -50,14 +50,6 @@ if "messages" not in st.session_state:
 if "chatbot" not in st.session_state:
     st.session_state.chatbot = BootcampChatbot()
 
-# ------------------- SIDEBAR -------------------
-with st.sidebar:
-    st.header(" Settings")
-    
-    if st.button(" Clear Chat History"):
-        st.session_state.messages = []
-        st.session_state.chatbot.clear_history("streamlit_session")
-        st.rerun()
 
 # ------------------- DISPLAY CHAT HISTORY -------------------
 for message in st.session_state.messages:
@@ -76,7 +68,7 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
     with st.chat_message("user"):
         st.markdown(prompt)
     
-    # Get bot response from backend
+  
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:

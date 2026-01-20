@@ -39,7 +39,7 @@ if prompt := st.chat_input("Ask me anything (no tools, no memory)..."):
 	with st.chat_message("assistant"):
 		with st.spinner("Thinking..."):
 			try:
-				# Only send the latest user message to the LLM
+				
 				response = llm.invoke(prompt)
 				st.markdown(response.content)
 				st.session_state.messages.append({"role": "assistant", "content": response.content})
