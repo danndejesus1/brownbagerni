@@ -40,7 +40,7 @@ def extract_video_urls(text):
     return urls
 
 # ------------------- TITLE -------------------
-st.title("🤖 Brown Bag: Chatbots")
+st.title("Brown Bag: Chatbots")
 st.caption("Powered by LangGraph & LangChain - Ask me to find videos!")
 
 # ------------------- INITIALIZE SESSION STATE -------------------
@@ -52,9 +52,9 @@ if "chatbot" not in st.session_state:
 
 # ------------------- SIDEBAR -------------------
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header(" Settings")
     
-    if st.button("🗑️ Clear Chat History"):
+    if st.button(" Clear Chat History"):
         st.session_state.messages = []
         st.session_state.chatbot.clear_history("streamlit_session")
         st.rerun()
@@ -88,7 +88,7 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
                 video_urls = extract_video_urls(bot_message)
                 
                 if video_urls:
-                    st.success(f"🎬 Found {len(video_urls)} video(s)!")
+                    st.success(f" Found {len(video_urls)} video(s)!")
                     for url in video_urls:
                         st.video(url)
                     
@@ -109,6 +109,6 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
                 st.error(f"Error: {str(e)}")
                 st.info("Make sure your api key is set in your .env file!")
 
-# ------------------- FOOTER -------------------
+
 st.divider()
-st.caption("Built with ❤️ using Streamlit, LangChain & LangGraph")
+st.caption("Built with using Streamlit, LangChain & LangGraph")
