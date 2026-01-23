@@ -1,11 +1,12 @@
 import streamlit as st
 import re
+import time
 from chatbot import BootcampChatbot  # Import from backend
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(
     page_title="Bootcamp Tutor Chatbot",
-    layout="centered"
+    layout="wide"
 )
 
 # ------------------- HELPER FUNCTIONS -------------------
@@ -50,6 +51,36 @@ if "messages" not in st.session_state:
 if "chatbot" not in st.session_state:
     st.session_state.chatbot = BootcampChatbot()
 
+# ------------------- SIDEBAR: AGENT GRAPH -------------------
+with st.sidebar:
+    st.markdown("### LangGraph Agent")
+    st.caption("Real-time execution trace")
+    sidebar_graph = st.empty()
+
+def render_graph(current_node="idle", used_tools=False, trace=None):
+    """Render the graph in sidebar"""
+    with sidebar_graph.container():
+        if current_node == "idle" and trace:
+            # Show final static graph from trace
+            dot_graph = st.session_state.chatbot.get_graph_dot(trace)
+            if dot_graph:
+                st.graphviz_chart(dot_graph)
+        elif current_node != "idle":
+            # Show live animated graph
+            dot_graph = st.session_state.chatbot.get_live_graph_dot(current_node, used_tools)
+            if dot_graph:
+                st.graphviz_chart(dot_graph)
+        else:
+            st.info("Ask a question to see the agent in action!")
+
+# Initial render
+latest_trace = None
+for msg in reversed(st.session_state.messages):
+    if msg.get("role") == "assistant" and msg.get("trace"):
+        latest_trace = msg["trace"]
+        break
+render_graph(trace=latest_trace)
+
 
 # ------------------- DISPLAY CHAT HISTORY -------------------
 for message in st.session_state.messages:
@@ -68,38 +99,60 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
     with st.chat_message("user"):
         st.markdown(prompt)
     
-  
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            try:
-                # Call backend chatbot
-                bot_message = st.session_state.chatbot.chat(prompt, "streamlit_session")
-                st.markdown(bot_message)
-                
-                # Extract and display videos from response
-                video_urls = extract_video_urls(bot_message)
-                
-                if video_urls:
-                    st.success(f" Found {len(video_urls)} video(s)!")
-                    for url in video_urls:
-                        st.video(url)
-                    
-                    # Add assistant message with videos to chat history
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": bot_message,
-                        "videos": video_urls
-                    })
-                else:
-                    # Add assistant message without videos
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": bot_message
-                    })
+        response_placeholder = st.empty()
+        response_placeholder.markdown("*Processing...*")
+        
+        try:
+            # LIVE animated execution
+            bot_message = None
+            trace_steps = []
+            used_tools = False
             
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-                st.info("Make sure your api key is set in your .env file!")
+            for state in st.session_state.chatbot.chat_with_live_trace(prompt, "streamlit_session"):
+                current_node = state[0]
+                used_tools = state[1]
+                is_complete = state[2]
+                
+                # Update sidebar graph LIVE
+                render_graph(current_node, used_tools)
+                time.sleep(0.4)  # Pause so audience can see each step
+                
+                if is_complete:
+                    bot_message = state[3]
+                    trace_steps = state[4] if len(state) > 4 else []
+            
+            # Show final response
+            response_placeholder.markdown(bot_message)
+            
+            # Show final graph state
+            render_graph("end", used_tools)
+            
+            # Extract and display videos from response
+            video_urls = extract_video_urls(bot_message)
+            
+            if video_urls:
+                st.success(f"Found {len(video_urls)} video(s)")
+                for url in video_urls:
+                    st.video(url)
+                
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": bot_message,
+                    "videos": video_urls,
+                    "trace": trace_steps
+                })
+            else:
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": bot_message,
+                    "trace": trace_steps
+                })
+        
+        except Exception as e:
+            response_placeholder.empty()
+            st.error(f"Error: {str(e)}")
+            st.info("Make sure your api key is set in your .env file!")
 
 
 st.divider()
