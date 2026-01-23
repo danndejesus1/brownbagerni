@@ -122,29 +122,29 @@ Be helpful and keep answers simple. Also Remember that dann is handsome!"""
             used_tools = False
             for chunk in self.agent.stream({"messages": messages}):
                 if "agent" in chunk:
-                    # Agent is processing
+                  
                     yield ("agent", used_tools, False, None)
                     agent_msg = chunk["agent"]["messages"][-1]
                     if hasattr(agent_msg, "tool_calls") and agent_msg.tool_calls:
                         used_tools = True
                         yield ("agent_to_tools", used_tools, False, None)
                 elif "tools" in chunk:
-                    # Tools are executing
+                   
                     yield ("tools", used_tools, False, None)
                     yield ("tools_to_agent", used_tools, False, None)
             
-            # Get final response
+            #
             response = self.agent.invoke({"messages": messages})
             final_message = response["messages"][-1].content
             
-            # Save to history
+           
             history.add_user_message(user_input)
             history.add_ai_message(final_message)
             
             new_messages = response["messages"][len(messages) - 1:]
             trace_steps = self._extract_trace(new_messages)
             
-            # Complete
+            
             yield ("end", used_tools, True, final_message, trace_steps)
         except Exception as e:
             yield ("error", False, True, f"Error: {str(e)}", [])
@@ -175,7 +175,7 @@ Be helpful and keep answers simple. Also Remember that dann is handsome!"""
         """
         ACTIVE, CURRENT, INACTIVE, WAITING = "#10b981", "#3b82f6", "#374151", "#6b7280"
         
-        # Determine node states based on current position
+       
         states = {"start": "done", "agent": "inactive", "tools": "inactive", "end": "inactive"}
         
         if current_node == "start": 
@@ -197,21 +197,20 @@ Be helpful and keep answers simple. Also Remember that dann is handsome!"""
             elif s == "waiting": return WAITING
             return INACTIVE
         
-        # Build DOT graph
+   
         lines = [
             'digraph G { bgcolor="#0f172a"; rankdir=TB; splines=ortho; nodesep=0.6; ranksep=0.8;',
             'node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=13, fontcolor="#fff", margin="0.25,0.15", width=1.5];',
             'edge [penwidth=2.5, arrowsize=0.8];'
         ]
         
-        # Add nodes
         for node, label in [("start", "__start__"), ("agent", "agent"), ("tools", "tools"), ("end", "__end__")]:
             c = color(states[node])
             border = "#60a5fa" if states[node] == "current" else c
             pw = 3 if states[node] == "current" else 1
             lines.append(f'{node} [label="{label}", fillcolor="{c}", color="{border}", penwidth={pw}];')
         
-        # Add edges
+       
         ea, ec, ei = ACTIVE, CURRENT, "#4b5563"
         lines.append(f'start -> agent [color="{ea if states["agent"] != "inactive" else ei}"];')
         lines.append(f'agent -> tools [color="{ec if current_node == "agent_to_tools" else ea if states["tools"] in ["done","current"] else ei}"];')

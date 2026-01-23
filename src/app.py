@@ -12,27 +12,26 @@ st.set_page_config(
 # ------------------- HELPER FUNCTIONS -------------------
 def extract_video_urls(text):
     """Extract YouTube and video URLs from text"""
-    # YouTube patterns
+
     youtube_patterns = [
         r'(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})',
         r'(?:https?://)?(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})',
     ]
     
-    # Video file patterns
+  
     video_patterns = [
         r'https?://[^\s]+\.(?:mp4|mov|avi|mkv|webm|flv)',
     ]
     
     urls = []
     
-    # Check for YouTube URLs
+  
     for pattern in youtube_patterns:
         matches = re.finditer(pattern, text)
         for match in matches:
             video_id = match.group(1)
             urls.append(f"https://www.youtube.com/watch?v={video_id}")
     
-    # Check for direct video URLs
     for pattern in video_patterns:
         matches = re.finditer(pattern, text)
         for match in matches:
@@ -61,13 +60,13 @@ def render_graph(current_node="idle", used_tools=False, trace=None):
     """Render the graph in sidebar"""
     with sidebar_graph.container():
         if current_node == "idle" and trace:
-            # Show completed graph from trace (using live graph at "end" state)
+         
             trace_used_tools = any(s["node"] in ["Agent Decision", "Tool Execution"] for s in trace)
             dot_graph = st.session_state.chatbot.get_live_graph_dot("end", trace_used_tools)
             if dot_graph:
                 st.graphviz_chart(dot_graph)
         elif current_node != "idle":
-            # Show live animated graph
+ 
             dot_graph = st.session_state.chatbot.get_live_graph_dot(current_node, used_tools)
             if dot_graph:
                 st.graphviz_chart(dot_graph)
@@ -87,8 +86,7 @@ render_graph(trace=latest_trace)
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        
-        # If message contains videos, display them
+     
         if "videos" in message:
             for video_url in message["videos"]:
                 st.video(video_url)
@@ -105,7 +103,7 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
         response_placeholder.markdown("*Processing...*")
         
         try:
-            # LIVE animated execution
+        
             bot_message = None
             trace_steps = []
             used_tools = False
@@ -115,21 +113,20 @@ if prompt := st.chat_input("Ask me anything... or ask me to find a video!"):
                 used_tools = state[1]
                 is_complete = state[2]
                 
-                # Update sidebar graph LIVE
+            
                 render_graph(current_node, used_tools)
-                time.sleep(0.4)  # Pause so audience can see each step
+                time.sleep(0.4) 
                 
                 if is_complete:
                     bot_message = state[3]
                     trace_steps = state[4] if len(state) > 4 else []
             
-            # Show final response
+          
             response_placeholder.markdown(bot_message)
             
-            # Show final graph state
+           
             render_graph("end", used_tools)
-            
-            # Extract and display videos from response
+        
             video_urls = extract_video_urls(bot_message)
             
             if video_urls:
