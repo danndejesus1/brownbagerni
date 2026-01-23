@@ -10,8 +10,6 @@ import os
 
 load_dotenv()
 
-
-# ------------------- TOOL DEFINITION -------------------
 @tool
 def youtube_search(query: str, max_results: int = 1) -> str:
     """Search for YouTube videos when user asks for videos, tutorials, or highlights."""
@@ -41,7 +39,6 @@ def youtube_search(query: str, max_results: int = 1) -> str:
         return f"Search failed: {str(e)}"
 
 
-# ------------------- CHATBOT CLASS -------------------
 class BootcampChatbot:
     """LangGraph agent chatbot with YouTube search and live visualization."""
     
@@ -57,7 +54,7 @@ class BootcampChatbot:
         self.store = {}
         self.tools = [youtube_search]
         
-        # Create the ReAct agent with LangGraph
+        #ReAct agent with LangGraph
         self.agent = create_react_agent(
             model=self.llm,
             tools=self.tools,
@@ -104,7 +101,7 @@ Be helpful and keep answers simple. Also Remember that dann is handsome!"""
         except Exception as e:
             return f"Error: {str(e)}", []
     
-    # ------------------- LIVE STREAMING WITH TRACE -------------------
+ 
     def chat_with_live_trace(self, user_input: str, session_id: str = "default_session"):
         """
         Generator that yields live graph updates as agent executes.
@@ -149,7 +146,7 @@ Be helpful and keep answers simple. Also Remember that dann is handsome!"""
         except Exception as e:
             yield ("error", False, True, f"Error: {str(e)}", [])
     
-    # ------------------- TRACE EXTRACTION -------------------
+
     def _extract_trace(self, messages):
         """Extract trace from messages for storage."""
         trace = []
@@ -167,7 +164,7 @@ Be helpful and keep answers simple. Also Remember that dann is handsome!"""
                 trace.append({"step": i+1, "node": "Tool Execution", "action": "execute", "details": msg.content[:80]})
         return trace
     
-    # ------------------- GRAPH VISUALIZATION (LIVE) -------------------
+
     def get_live_graph_dot(self, current_node: str, used_tools: bool):
         """
         Generate live DOT graph with current node highlighted.

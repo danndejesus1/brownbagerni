@@ -3,13 +3,12 @@ import re
 import time
 from chatbot import BootcampChatbot  # Import from backend
 
-# ------------------- PAGE CONFIG -------------------
+
 st.set_page_config(
     page_title="Bootcamp Tutor Chatbot",
     layout="wide"
 )
 
-# ------------------- HELPER FUNCTIONS -------------------
 def extract_video_urls(text):
     """Extract YouTube and video URLs from text"""
 
@@ -39,7 +38,7 @@ def extract_video_urls(text):
     
     return urls
 
-# ------------------- TITLE -------------------
+
 st.title("Brown Bag: Powered-up! Chatbot")
 st.caption("Powered by LangGraph & LangChain - Ask me to find videos!")
 
