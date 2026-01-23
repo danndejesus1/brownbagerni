@@ -1,8 +1,3 @@
-# ============================================================================
-# LangGraph Agent Chatbot with Live Visualization
-# Azure OpenAI + YouTube Search + Memory
-# ============================================================================
-
 # ------------------- IMPORTS -------------------
 from langchain_openai import AzureChatOpenAI
 from langchain_community.chat_message_histories import ChatMessageHistory
@@ -25,7 +20,7 @@ def youtube_search(query: str, max_results: int = 1) -> str:
         if not api_key:
             return "YouTube API key not configured."
         
-        max_results = max(1, min(max_results, 10))
+        max_results = max(1, min(max_results, 5))
         youtube = build("youtube", "v3", developerKey=api_key)
         
         response = youtube.search().list(
