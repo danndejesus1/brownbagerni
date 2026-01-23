@@ -61,8 +61,9 @@ def render_graph(current_node="idle", used_tools=False, trace=None):
     """Render the graph in sidebar"""
     with sidebar_graph.container():
         if current_node == "idle" and trace:
-            # Show final static graph from trace
-            dot_graph = st.session_state.chatbot.get_graph_dot(trace)
+            # Show completed graph from trace (using live graph at "end" state)
+            trace_used_tools = any(s["node"] in ["Agent Decision", "Tool Execution"] for s in trace)
+            dot_graph = st.session_state.chatbot.get_live_graph_dot("end", trace_used_tools)
             if dot_graph:
                 st.graphviz_chart(dot_graph)
         elif current_node != "idle":
